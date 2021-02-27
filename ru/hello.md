@@ -21,12 +21,12 @@ syntax = "proto3"; // мы рассматриваем только proto3 как
 package github; // обычно имя сервиса
 option go_package = ".;pb"; // можно не указывать, помогает go генератору использовать верные имена пакетов
 
-import "google/api/annotations.proto"; // так как в файле для http клиента и сервера присуствуют аннотации, требуется указать импорт
-import "protoc-gen-openapiv2/options/annotations.proto"; // так как в файле для http клиента и сервера присуствуют аннотации, требуется указать импорт
+import "api/annotations.proto"; // так как в файле для http клиента и сервера присуствуют аннотации, требуется указать импорт
+import "openapiv2/annotations.proto"; // так как в файле для http клиента и сервера присуствуют аннотации, требуется указать импорт
 
 service Github { // название сервиса, оно будет использоваться в сгенерированном коде, а также фигурировать в служебных структурах в виде имени Endpoint
   rpc LookupUser(LookupUserReq) returns (LookupUserRsp) { // описание имени метода, принимаемых и отправляемых типов сообщений
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = { // openapi аннотация
+    option (micro.openapiv2.openapiv2_operation) = { // openapi аннотация
       operation_id: "LookupUser"; // название операции в openapi
       responses: { // типы ответов
         key: "default"; // используется для всех типов ответов, кроме стандартного, описанного в методе
@@ -36,7 +36,7 @@ service Github { // название сервиса, оно будет испо�
         }
       }
     };
-    option (google.api.http) = { get: "/users/{username}"; }; // аннотация, сообщаяющая о том, что для вызова метода требутеся сделать GET запрос на путь /users где username берется из структуры запроса и подставляется в путь, например /users/github_user . В случае методов POST/PATCH/PUT может присуствовать еще body:"*"; сообщающая, что все поля структуры запроса следует передать в теле реквеста.
+    option (micro.api.http) = { get: "/users/{username}"; }; // аннотация, сообщаяющая о том, что для вызова метода требутеся сделать GET запрос на путь /users где username берется из структуры запроса и подставляется в путь, например /users/github_user . В случае методов POST/PATCH/PUT может присуствовать еще body:"*"; сообщающая, что все поля структуры запроса следует передать в теле реквеста.
   };
 };
 
@@ -63,7 +63,7 @@ message Error { // описание сообщения об ошибке, для
 package main
 
 import (
-        _ "github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-openapiv2"
+        _ "github.com/unistack-org/micro-proto/openapiv2"
 )
 ```
 
@@ -74,8 +74,8 @@ import (
 ```shell
 #!/bin/sh -e
 
-INC=$(go list -f '{{ .Dir }}' -m github.com/grpc-ecosystem/grpc-gateway/v2)
-ARGS="-I${INC} -I${INC}/third_party/googleapis"
+INC=$(go list -f '{{ .Dir }}' -m github.com/unistack-org/micro-proto)
+ARGS="-I${INC}"
 
 protoc $ARGS -Iproto --openapiv2_out=disable_default_errors=true,allow_merge=true:./proto/ --go_out=paths=source_relative:./proto/ --micro_out=components="micro|http",debug=true,paths=source_relative:./proto/ proto/*.proto
 ```
@@ -104,7 +104,7 @@ import (
 func main() {
 	hcli := mhttp.NewClient(client.ContentType("application/json"), client.Codec("application/json", jsoncodec.NewCodec()))
 	cli := client.NewClientCallOptions(hcli, client.WithAddress("https://api.github.com"))
-	gh := pb.NewGithubService("github", c)
+	gh := pb.NewGithubClient("github", c)
 
 	rsp, err := gh.LookupUser(context.TODO(), &pb.LookupUserReq{Username: "vtolstov"})
 	if err != nil {
@@ -143,7 +143,7 @@ func NewGithubHandler() *GithubHandler {
 func (h *GithubHandler) LookupUser(ctx context.Context, req *pb.LookupUserReq, rsp *pb.LookupUserRsp) error {
 	if req.GetUsername() == "" || req.GetUsername() != "vtolstov" {
 		httpsrv.SetRspCode(ctx, http.StatusBadRequest)
-		return &pb.Error{Message: "name is not correct"}
+		return httpsrv.SetError(&pb.Error{Message: "name is not correct"})
 	}
 	rsp.Name = "Vasiliy Tolstov"
 	httpsrv.SetRspCode(ctx, http.StatusOK)
@@ -202,7 +202,7 @@ func main() {
 	// Создаем реализацию для сервера
 	eh := handler.NewGithubHandler()
 	// Регистрируем реализацию в сервере
-	if err := pb.RegisterGithubHandler(srv.Server(), eh); err != nil {
+	if err := pb.RegisterGithubServer(srv.Server(), eh); err != nil {
 		logger.Fatal(ctx, err)
 	}
 	// Запускаем сервис
@@ -218,5 +218,5 @@ func main() {
 2. Для использования GRPC сервера в коде нужно поменять импорт и использовать grpcsrv.NewServer() вместо httpsrv.NewServer()
 
 ````
-https://github.com/unistack-org/micro-server-grpc
+https://github.com/unistack-org/micro-server-grpc/v3
 ````
