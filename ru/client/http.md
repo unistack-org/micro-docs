@@ -13,12 +13,12 @@ syntax = "proto3";
 package github;                                                                                                                                        
 option go_package = "github.com//unistack-org/micro-tests/client/http/proto;pb";                                                                       
                                                                                                                                                        
-import "google/api/annotations.proto";                                                                                                                 
-import "protoc-gen-openapiv2/options/annotations.proto";                                                                                               
+import "api/annotations.proto";                                                                                                                 
+import "openapiv2/annotations.proto";                                                                                               
                                                                                                                                                        
 service Github {                                                                                                                                       
   rpc LookupUser(LookupUserReq) returns (LookupUserRsp) {                                                                                              
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {                                                                         
+    option (micro.openapiv2.openapiv2_operation) = {                                                                         
       operation_id: "LookupUser";                                                                                                                      
       responses: {                                                                                                                                     
         key: "default";                                                                                                                                
@@ -28,7 +28,7 @@ service Github {
         }                                                                                                                                              
       }                                                                                                                                                
     };                                                                                                                                                 
-    option (google.api.http) = { get: "/users/{username}"; };                                                                                          
+    option (micro.api.http) = { get: "/users/{username}"; };                                                                                          
   };                                                                                                                                                   
 };                                                                                                                                                     
 message LookupUserReq {                                                                                                                                
