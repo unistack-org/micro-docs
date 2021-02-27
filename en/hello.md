@@ -23,14 +23,14 @@ See code below with .proto file example for better undestanding:
 syntax = "proto3"; // syntax of proto file
 
 package github; // service name
-option go_package = ".;pb"; // optional, help code generator names packages in a right way
+option go_package = "domain.tld/some_repo;pb"; // optional, help code generator names packages in a right way
 
-import "google/api/annotations.proto"; // for using http next to grpc we have to define import
-import "protoc-gen-openapiv2/options/annotations.proto"; // for using openapi generation (describe our services) we have to define import 
+import "api/annotations.proto"; // for using http next to grpc we have to define import
+import "openapiv2/annotations.proto"; // for using openapi generation (describe our services) we have to define import 
 
 service Github {// service name - will be using by code generator on the client side and server side support functions (create service client, create service server), in Endpoints and openapi description
   rpc LookupUser(LookupUserReq) returns (LookupUserRsp) {// description for method with structures to receive and respond
-    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {// openapi annotaiont
+    option (micro.openapiv2.openapiv2_operation) = {// openapi annotaiont
       operation_id: "LookupUser"; // operation name in openapi
       responses: {// type of responses
         key: "default"; // using by any of response type except standart one described in the method
@@ -40,7 +40,7 @@ service Github {// service name - will be using by code generator on the client 
         }
       }
     };
-    option (google.api.http) = {get: "/users/{username}";}; // describes endpoint which should be used connecting to rpc LookupUser via http with method GET and path /users/username. In order to use POST, PUT, PATCH requests also may contain body. Body is defining the same way as path variable, but instead should be using link to message structure. If body is not pre-defined should be used body:'*' declaration.
+    option (micro.api.http) = {get: "/users/{username}";}; // describes endpoint which should be used connecting to rpc LookupUser via http with method GET and path /users/username. In order to use POST, PUT, PATCH requests also may contain body. Body is defining the same way as path variable, but instead should be using link to message structure. If body is not pre-defined should be used body:'*' declaration.
   };
 };
 
@@ -70,7 +70,7 @@ example below:
 package main
 
 import (
-	_ "github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-openapiv2"
+	_ "github.com/unistack-org/micro-proto/openapiv2"
 )
 ```
 
@@ -82,8 +82,8 @@ Next step - script for code generation:
 ```shell
 #!/bin/sh -e
 
-INC=$(go list -f '{{ .Dir }}' -m github.com/grpc-ecosystem/grpc-gateway/v2)
-ARGS="-I${INC} -I${INC}/third_party/googleapis"
+INC=$(go list -f '{{ .Dir }}' -m github.com/unistack-org/micro-proto)
+ARGS="-I${INC}"
 
 protoc $ARGS -Iproto --openapiv2_out=disable_default_errors=true,allow_merge=true:./proto/ --go_out=paths=source_relative:./proto/ --micro_out=components="micro|http",debug=true,paths=source_relative:./proto/ proto/*.proto
 ```
@@ -113,7 +113,7 @@ import (
 func main() {
 	hcli := mhttp.NewClient(client.ContentType("application/json"), client.Codec("application/json", jsoncodec.NewCodec()))
 	cli := client.NewClientCallOptions(hcli, client.WithAddress("https://api.github.com"))
-	gh := pb.NewGithubService("github", c)
+	gh := pb.NewGithubClient("github", c)
 
 	rsp, err := gh.LookupUser(context.TODO(), &pb.LookupUserReq{Username: "vtolstov"})
 	if err != nil {
@@ -152,7 +152,7 @@ func NewGithubHandler() *GithubHandler {
 func (h *GithubHandler) LookupUser(ctx context.Context, req *pb.LookupUserReq, rsp *pb.LookupUserRsp) error {
 	if req.GetUsername() == "" || req.GetUsername() != "vtolstov" {
 		httpsrv.SetRspCode(ctx, http.StatusBadRequest)
-		return &pb.Error{Message: "name is not correct"}
+		return httpsrv.SetError(&pb.Error{Message: "name is not correct"})
 	}
 	rsp.Name = "Vasiliy Tolstov"
 	httpsrv.SetRspCode(ctx, http.StatusOK)
@@ -211,7 +211,7 @@ func main() {
 	// create handler
 	eh := handler.NewGithubHandler()
 	// register handler in server
-	if err := pb.RegisterGithubHandler(srv.Server(), eh); err != nil {
+	if err := pb.RegisterGithubServer(srv.Server(), eh); err != nil {
 		logger.Fatal(ctx, err)
 	}
 	// run service
@@ -228,5 +228,5 @@ Important note:
    instead of httpsrv.NewServer(). Library could be found here:
 
 ````
-github.com/unistack-org/micro-server-grpc
+github.com/unistack-org/micro-server-grpc/v3
 ````
